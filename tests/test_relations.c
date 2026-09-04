@@ -534,6 +534,58 @@ void test_relations_unsupported(void) {
     ) == 0);
 }
 
+static void assert_contains(const char *container_wkt, const char *other_wkt,
+    bool contains, bool covers)
+{
+    struct tg_geom *container = tg_parse_wkt(container_wkt);
+    struct tg_geom *other = tg_parse_wkt(other_wkt);
+    assert(container && !tg_geom_error(container));
+    assert(other && !tg_geom_error(other));
+    assert(tg_geom_contains(container, other) == contains);
+    assert(tg_geom_within(other, container) == contains);
+    assert(tg_geom_covers(container, other) == covers);
+    assert(tg_geom_coveredby(other, container) == covers);
+    tg_geom_free(container);
+    tg_geom_free(other);
+}
+
+void test_relations_collection_contains(void) {
+    assert_contains(
+        "POLYGON ((0 0, 3 0, 3 3, 0 3, 0 0), "
+        "(1 1, 1 2, 2 1, 1 1))",
+        "POLYGON ((1 1, 1 2, 2 1, 1 1))", false, false);
+
+    assert_contains("GEOMETRYCOLLECTION (POINT (0 0))",
+        "POINT (0 0)", true, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (0 0, 0 1))",
+        "POINT (0 0)", false, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (POINT (0 0), LINESTRING (0 0, 0 1))",
+        "POINT (0 0.5)", true, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (POINT (-1 -1), LINESTRING (0 0, 0 1))",
+        "POINT (-1 -1)", true, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (POINT (0 0), "
+        "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+        "POINT (0 0)", false, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (POINT (0 0), "
+        "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+        "POINT (0.25 0.25)", true, true);
+    assert_contains("MULTILINESTRING ((0 0, 0 1), (0 0, 1 0))",
+        "POINT (0 0)", true, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (LINESTRING (0 0, 0 1), "
+        "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+        "LINESTRING (0 0, 0 1)", false, true);
+    assert_contains(
+        "GEOMETRYCOLLECTION (LINESTRING (0 0, 0 1), "
+        "POLYGON ((0 0, 0 1, 1 0, 0 0)))",
+        "LINESTRING (0 0, 0.25 0.25)", true, true);
+}
+
 void test_relations_various(void) {
     assert(tg_segment_covers_point(S(1.31,1.88,1.65,1.8), P(1.65,1.8)));
     assert(tg_segment_covers_point(S(1.31,1.88,1.65,1.8), P(1.31,1.88)));
@@ -572,6 +624,7 @@ int main(int argc, char **argv) {
     }
 
     do_test(test_relations_cases);
+    do_test(test_relations_collection_contains);
     do_test(test_relations_unsupported);
     do_test(test_relations_various);
     return 0;

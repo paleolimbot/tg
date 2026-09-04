@@ -113,7 +113,7 @@ void test_poly_covers_poly() {
     DUAL_POLY_TEST(POLY(RING(octagon), hole1), {
         assert(tg_poly_covers_poly(poly, poly1));
         assert(!tg_poly_covers_poly(poly, tg_poly_move_gc(poly1, 1, 0)));
-        assert(tg_poly_covers_poly(poly, POLY(hole1)));
+        assert(!tg_poly_covers_poly(poly, POLY(hole1)));
         assert(!tg_poly_covers_poly(poly,POLY(hole2)));
     });
 }
@@ -203,7 +203,7 @@ void test_poly_casting() {
     assert(!tg_poly_intersects_line(poly2, NULL));
 
     assert(tg_poly_covers_poly(poly1, poly2));
-    assert(tg_poly_covers_poly(poly2, poly3));
+    assert(!tg_poly_covers_poly(poly2, poly3));
     assert(tg_poly_covers_poly(poly1, poly3));
     assert(!tg_poly_covers_poly(poly2, poly1));
     assert(!tg_poly_covers_poly(poly3, poly1));
