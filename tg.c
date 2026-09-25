@@ -136,6 +136,8 @@ TG_EXTERN void tg_geom_search(const struct tg_geom *geom, struct tg_rect rect,
     void *udata);
 TG_EXTERN int tg_geom_fullrect(const struct tg_geom *geom, double min[4],
     double max[4]);
+TG_EXTERN bool tg_geom_containment_predicates_supported(const struct tg_geom *a,
+    const struct tg_geom *b);
 TG_EXTERN bool tg_geom_equals(const struct tg_geom *a, const struct tg_geom *b);
 TG_EXTERN bool tg_geom_intersects(const struct tg_geom *a,
     const struct tg_geom *b);
@@ -5535,6 +5537,111 @@ void tg_geom_foreach(const struct tg_geom *geom,
     void *udata)
 {
     geom_foreach(geom, iter, udata);
+}
+
+struct predicates_supported_pair_ctx {
+    const struct tg_geom *target;
+    const struct tg_geom *first;
+    bool supported;
+};
+
+static bool predicates_supported_pair_iter(const struct tg_geom *second,
+    void *udata)
+{
+    struct predicates_supported_pair_ctx *ctx = udata;
+    if (second != ctx->first &&
+        tg_geom_intersects(ctx->first, second) &&
+        tg_geom_intersects(second, ctx->target))
+    {
+        ctx->supported = false;
+        return false;
+    }
+    return true;
+}
+
+struct predicates_supported_source_ctx {
+    const struct tg_geom *source;
+    const struct tg_geom *target;
+    bool supported;
+    bool covered;
+};
+
+static bool predicates_supported_cover_iter(const struct tg_geom *source,
+    void *udata)
+{
+    struct predicates_supported_source_ctx *ctx = udata;
+    if (tg_geom_covers(source, ctx->target)) {
+        ctx->covered = true;
+        return false;
+    }
+    return true;
+}
+
+static bool predicates_supported_source_iter(const struct tg_geom *first,
+    void *udata)
+{
+    struct predicates_supported_source_ctx *ctx = udata;
+    if (!tg_geom_intersects(first, ctx->target)) {
+        return true;
+    }
+    struct predicates_supported_pair_ctx pair = {
+        .target = ctx->target,
+        .first = first,
+        .supported = true,
+    };
+    tg_geom_foreach(ctx->source, predicates_supported_pair_iter, &pair);
+    if (!pair.supported) {
+        ctx->supported = false;
+        return false;
+    }
+    return true;
+}
+
+static bool predicates_supported_target_iter(const struct tg_geom *target,
+    void *udata)
+{
+    struct predicates_supported_source_ctx *ctx = udata;
+    ctx->target = target;
+    ctx->covered = false;
+    tg_geom_foreach(ctx->source, predicates_supported_cover_iter, ctx);
+    if (ctx->covered) {
+        return true;
+    }
+    tg_geom_foreach(ctx->source, predicates_supported_source_iter, ctx);
+    return ctx->supported;
+}
+
+static bool geom_predicates_supported_one(const struct tg_geom *source,
+    const struct tg_geom *target)
+{
+    struct predicates_supported_source_ctx ctx = {
+        .source = source,
+        .supported = true,
+    };
+    tg_geom_foreach(target, predicates_supported_target_iter, &ctx);
+    return ctx.supported;
+}
+
+/// Tests whether predicates can be evaluated without combining intersecting
+/// collection components. Returns false conservatively when a component of
+/// either geometry intersects multiple interacting components of the other
+/// geometry and no single component covers it. In that case a correct
+/// predicate may require evaluating the components as a union.
+bool tg_geom_containment_predicates_supported(const struct tg_geom *a,
+    const struct tg_geom *b)
+{
+    if (!a || !b || tg_geom_error(a) || tg_geom_error(b)) {
+        return false;
+    }
+    bool a_is_collection = a->head.type >= TG_MULTIPOINT;
+    bool b_is_collection = b->head.type >= TG_MULTIPOINT;
+    if (a->head.type == TG_POINT || b->head.type == TG_POINT ||
+        (!a_is_collection && !b_is_collection))
+    {
+        return true;
+    }
+    return geom_predicates_supported_one(a, b) &&
+        geom_predicates_supported_one(b, a);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
