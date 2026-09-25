@@ -128,6 +128,8 @@ int tg_geom_fullrect(const struct tg_geom *geom, double min[4], double max[4]);
 /// @defgroup GeometryPredicates Geometry predicates
 /// Functions for testing the spatial relations of two geometries.
 /// @{
+/// Tests whether contains and covered-by predicates are supported for two
+/// geometries.
 bool tg_geom_containment_predicates_supported(const struct tg_geom *a,
     const struct tg_geom *b);
 bool tg_geom_equals(const struct tg_geom *a, const struct tg_geom *b);

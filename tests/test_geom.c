@@ -826,6 +826,35 @@ void test_geom_containment_predicates_supported() {
     tg_geom_free(a);
     tg_geom_free(b);
 
+    // Intersecting collection components are supported when the target only
+    // intersects one of them.
+    a = tg_parse_wkt(
+        "MULTILINESTRING ((0 0, 2 0), (2 0, 4 0))");
+    b = tg_parse_wkt("LINESTRING (0.5 0, 1.5 0)");
+    assert(tg_geom_containment_predicates_supported(a, b));
+    assert(tg_geom_containment_predicates_supported(b, a));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    // The condition depends on intersection, even when one component covers
+    // the complete target by itself.
+    a = tg_parse_wkt(
+        "MULTILINESTRING ((0 0, 3 0), (1 0, 2 0))");
+    b = tg_parse_wkt("LINESTRING (1.25 0, 1.75 0)");
+    assert(!tg_geom_containment_predicates_supported(a, b));
+    assert(!tg_geom_containment_predicates_supported(b, a));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    // Point collections do not form a non-point target.
+    a = tg_parse_wkt("MULTIPOINT ((1 0), (2 0))");
+    b = tg_parse_wkt(
+        "MULTILINESTRING ((0 0, 2 0), (1 0, 3 0))");
+    assert(tg_geom_containment_predicates_supported(a, b));
+    assert(tg_geom_containment_predicates_supported(b, a));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
     a = tg_parse_wkt("GEOMETRYCOLLECTION EMPTY");
     b = tg_parse_wkt("POINT (1 1)");
     assert(tg_geom_containment_predicates_supported(a, b));
