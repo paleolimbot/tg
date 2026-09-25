@@ -775,6 +775,70 @@ void test_geom_various() {
         30, 15));
 }
 
+void test_geom_containment_predicates_supported() {
+    struct tg_geom *a;
+    struct tg_geom *b;
+
+    assert(!tg_geom_containment_predicates_supported(NULL, NULL));
+
+    a = tg_parse_wkt("LINESTRING (0 0, 2 0)");
+    b = tg_parse_wkt("LINESTRING (0.5 0, 1.5 0)");
+    assert(tg_geom_containment_predicates_supported(a, b));
+    assert(tg_geom_containment_predicates_supported(b, a));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    // A predicate may need the union of both touching components. This is the
+    // unsupported case reported in issue #29.
+    a = tg_parse_wkt(
+        "MULTILINESTRING ((0 0, 1 0), (1 0, 2 0))");
+    b = tg_parse_wkt("LINESTRING (0.5 0, 1.5 0)");
+    assert(!tg_geom_containment_predicates_supported(a, b));
+    assert(!tg_geom_containment_predicates_supported(b, a));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    // A point at the shared endpoint is covered by either component and does
+    // not require collective coverage.
+    a = tg_parse_wkt(
+        "MULTILINESTRING ((0 0, 1 0), (1 0, 2 0))");
+    b = tg_parse_wkt("POINT (1 0)");
+    assert(tg_geom_containment_predicates_supported(a, b));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    // Disjoint collection components cannot collectively cover a connected
+    // component spanning the gap, so the component-wise result is supported.
+    a = tg_parse_wkt(
+        "MULTILINESTRING ((0 0, 1 0), (2 0, 3 0))");
+    b = tg_parse_wkt("LINESTRING (0.5 0, 2.5 0)");
+    assert(tg_geom_containment_predicates_supported(a, b));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    a = tg_parse_wkt(
+        "GEOMETRYCOLLECTION ("
+        "POLYGON ((0 0, 1.1 0, 1.1 1, 0 1, 0 0)), "
+        "POLYGON ((0.9 0, 2 0, 2 1, 0.9 1, 0.9 0)))");
+    b = tg_parse_wkt(
+        "POLYGON ((0.5 0.2, 1.5 0.2, 1.5 0.8, 0.5 0.8, 0.5 0.2))");
+    assert(!tg_geom_containment_predicates_supported(a, b));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    a = tg_parse_wkt("GEOMETRYCOLLECTION EMPTY");
+    b = tg_parse_wkt("POINT (1 1)");
+    assert(tg_geom_containment_predicates_supported(a, b));
+    tg_geom_free(a);
+    tg_geom_free(b);
+
+    a = tg_parse_wkt("INTENTIONAL ERROR");
+    b = tg_parse_wkt("POINT (1 1)");
+    assert(!tg_geom_containment_predicates_supported(a, b));
+    tg_geom_free(a);
+    tg_geom_free(b);
+}
+
 void test_geom_empty() {
     assert(tg_geom_is_empty(NULL));
     struct tg_geom *g = tg_geom_new_point_empty();
@@ -1009,6 +1073,7 @@ int main(int argc, char **argv) {
     do_test(test_geom_empty);
     do_test(test_geom_extra_coords);
     do_test(test_geom_various);
+    do_test(test_geom_containment_predicates_supported);
     do_test(test_geom_copy);
     do_chaos_test(test_geom_chaos);
     do_test(test_geom_error);
